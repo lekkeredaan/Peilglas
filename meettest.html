@@ -24,10 +24,15 @@ button{font:inherit;cursor:pointer}
 .btn:disabled{opacity:.5;cursor:default}
 .link{min-height:44px;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:15px;text-decoration:underline}
 .glasses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.glasses label{display:flex;align-items:center;gap:8px;min-height:48px;padding:0 12px;border:2px solid var(--line);border-radius:12px;font-weight:600;font-size:15px;cursor:pointer}
-.glasses input{accent-color:var(--ink);width:18px;height:18px;margin:0}
+.glasses label{position:relative;display:flex;align-items:center;gap:10px;min-height:76px;padding:8px 10px;border:2px solid var(--line);border-radius:14px;font-weight:700;font-size:15px;line-height:1.2;cursor:pointer}
+.glasses input{position:absolute;opacity:0;width:1px;height:1px}
 .glasses label:has(input:checked){border-color:var(--ink);background:var(--amber-soft)}
-.glasses small{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto}
+.glasses label:has(input:focus-visible){outline:3px solid var(--teal-deep);outline-offset:2px}
+.glasses svg{width:38px;height:54px;flex:none}
+.glasses .shape{fill:var(--mist);stroke:var(--ink);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.glasses label:has(input:checked) .shape{fill:var(--amber)}
+.glasses .extra{fill:none;stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
+.glasses small{display:block;font-family:'DM Mono',monospace;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
 .shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .shot{position:relative;aspect-ratio:3/4;border-radius:16px;background:var(--mist);border:2px dashed var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;padding:0}
 .shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -40,7 +45,8 @@ ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-si
 #view{position:relative;flex:1 1 0;min-height:0;border-radius:24px;background:#2B1B45;overflow:hidden}
 #view video,#view .ghost{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #view .ghost{opacity:.35;pointer-events:none}
-#view svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:88%;width:auto;pointer-events:none}
+#view svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:88%;width:auto;max-width:92%;overflow:visible;pointer-events:none}
+#view .tag{position:absolute;right:10px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--dark);color:var(--mist);border-radius:6px;padding:3px 6px;transform:translateY(-50%);pointer-events:none}
 #cam .hint{background:var(--ink);border-radius:14px;padding:10px 12px;font-size:14px;color:#E4DAF5}
 #cam .bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
 #cam .bar .link{color:#C9B8E8;width:110px}
@@ -124,13 +130,14 @@ ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-si
   <div id="view">
     <video id="video" playsinline muted autoplay></video>
     <img class="ghost" id="ghost" alt="" hidden>
-    <svg viewBox="0 0 230 400" aria-hidden="true">
-      <path d="M22 20 L208 20 L186 368 Q185 382 171 382 L59 382 Q45 382 44 368 Z" fill="rgba(243,238,250,0.05)" stroke="#FFB000" stroke-width="4" stroke-linejoin="round" stroke-dasharray="14 10"/>
-      <line x1="0" y1="20" x2="230" y2="20" stroke="#F3EEFA" stroke-width="2" opacity=".7"/>
-      <line x1="0" y1="382" x2="230" y2="382" stroke="#F3EEFA" stroke-width="2" opacity=".7"/>
-      <text x="226" y="14" text-anchor="end" font-family="DM Mono, monospace" font-size="11" fill="#F3EEFA">rand</text>
-      <text x="226" y="396" text-anchor="end" font-family="DM Mono, monospace" font-size="11" fill="#F3EEFA">bodem</text>
+    <svg viewBox="0 0 40 56" aria-hidden="true">
+      <path id="frameShape" d="" fill="rgba(243,238,250,0.05)" stroke="#FFB000" stroke-width="4" stroke-linejoin="round" stroke-dasharray="14 10" vector-effect="non-scaling-stroke"/>
+      <path id="frameExtra" d="" fill="none" stroke="#FFB000" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 8" vector-effect="non-scaling-stroke" opacity=".7"/>
+      <line id="frameRim" x1="-4" x2="44" stroke="#F3EEFA" stroke-width="2" opacity=".8" vector-effect="non-scaling-stroke"/>
+      <line id="frameBottom" x1="-4" x2="44" stroke="#F3EEFA" stroke-width="2" opacity=".8" vector-effect="non-scaling-stroke"/>
     </svg>
+    <div class="tag" id="tagRim">rand</div>
+    <div class="tag" id="tagBottom">bodem</div>
   </div>
   <div class="hint" id="camHint"></div>
   <div class="bar">
@@ -141,16 +148,35 @@ ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-si
 </div>
 
 <script>
+// id, naam, inhoud, omtrek (in een vak van 40 x 56), extra lijnen (voet), y van de rand, y van de binnenbodem
 const GLASSES = [
-  ['auto', 'Laat herkennen', ''], ['fluitje', 'Fluitje', '20 cl'], ['vaasje', 'Vaasje', '25 cl'], ['pint', 'Pint', '50 cl'],
-  ['longdrink', 'Longdrink', '27 cl'], ['waterglas', 'Waterglas', '20 cl'], ['wijnglas', 'Wijnglas', '35 cl'], ['anders', 'Ander glas', ''],
+  ['auto', 'Weet ik niet', 'AI herkent het', 'M9 6 L31 6 L27 52 L13 52 Z', 'M17 22 Q17 17 20.5 17 Q24 17 24 21 Q24 24 20.5 26 L20.5 30 M20.5 35 L20.5 36', 6, 52],
+  ['fluitje', 'Fluitje', '20 cl', 'M12 4 L28 4 L26 52 L14 52 Z', '', 4, 52],
+  ['vaasje', 'Vaasje', '25 cl', 'M8 8 L32 8 L27 52 L13 52 Z', '', 8, 52],
+  ['pint', 'Pint', '50 cl', 'M7 3 L33 3 Q35 13 31 19 L28 53 L12 53 L9 19 Q5 13 7 3 Z', '', 3, 53],
+  ['longdrink', 'Longdrink', '27 cl', 'M11 3 L29 3 L29 53 L11 53 Z', '', 3, 53],
+  ['waterglas', 'Waterglas', '20 cl', 'M8 20 L32 20 L29 52 L11 52 Z', '', 20, 52],
+  ['wijnglas', 'Wijnglas', '35 cl', 'M10 4 L30 4 Q34 27 20 31 Q6 27 10 4 Z', 'M20 31 L20 50 M12 52 L28 52', 4, 31],
+  ['anders', 'Ander glas', 'inhoud onbekend', 'M9 6 L31 6 L27 52 L13 52 Z', 'M15 29 L15 30 M20 29 L20 30 M25 29 L25 30', 6, 52],
 ];
 const $ = id => document.getElementById(id);
 const shots = [null, null];
 let current = 0, stream = null;
 
-$('glasses').innerHTML = GLASSES.map(([id, name, cl], i) =>
-  `<label><input type="radio" name="glass" value="${id}"${i === 0 ? ' checked' : ''}>${name}<small>${cl}</small></label>`).join('');
+$('glasses').innerHTML = GLASSES.map(([id, name, cl, shape, extra], i) =>
+  `<label><input type="radio" name="glass" value="${id}"${i === 0 ? ' checked' : ''}><svg viewBox="0 0 40 56" aria-hidden="true"><path class="shape" d="${shape}"/><path class="extra" d="${extra}"/></svg><span>${name}<small>${cl}</small></span></label>`).join('');
+
+// Het kader in de camera krijgt de vorm van het gekozen glas.
+function setFrame() {
+  const id = document.querySelector('input[name=glass]:checked').value;
+  const g = GLASSES.find(x => x[0] === id);
+  $('frameShape').setAttribute('d', g[3]);
+  $('frameExtra').setAttribute('d', id === 'wijnglas' ? g[4] : '');
+  for (const [line, tag, y] of [['frameRim', 'tagRim', g[5]], ['frameBottom', 'tagBottom', g[6]]]) {
+    $(line).setAttribute('y1', y); $(line).setAttribute('y2', y);
+    $(tag).style.top = (6 + 88 * y / 56) + '%';
+  }
+}
 
 function show(el, on) { $(el).hidden = !on; }
 function fail(msg) { $('error').textContent = msg; show('error', true); }
@@ -177,6 +203,7 @@ function setShot(i, dataUrl) {
 
 async function openCam(i) {
   current = i;
+  setFrame();
   show('error', false);
   $('camStep').textContent = `Foto ${i + 1} van 2`;
   $('camTitle').textContent = i === 0 ? 'Eerst je glas voor de slok' : 'Nu hetzelfde glas na de slok';
