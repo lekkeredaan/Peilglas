@@ -1,0 +1,9 @@
+{
+  "name": "peilglas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peilglas: een drankspel voor groepen waarbij de camera meet hoeveel er uit je glas is (Ravotters).",
+  "scripts": { "dev": "node dev-server.js" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "@anthropic-ai/sdk": "^1.8.0" }
+}

@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "peilglas", "runtimeExecutable": "node", "runtimeArgs": ["dev-server.js"], "port": 5175 },
+    { "name": "peilglas-nep", "runtimeExecutable": "node", "runtimeArgs": ["dev-server.js", "--nep"], "port": 5175 }
+  ]
+}

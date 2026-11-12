@@ -1,0 +1,6 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "regions": ["fra1"],
+  "functions": { "api/measure.js": { "maxDuration": 120 } }
+}
