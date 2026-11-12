@@ -28,10 +28,7 @@ button{font:inherit;cursor:pointer}
 .glasses input{position:absolute;opacity:0;width:1px;height:1px}
 .glasses label:has(input:checked){border-color:var(--ink);background:var(--amber-soft)}
 .glasses label:has(input:focus-visible){outline:3px solid var(--teal-deep);outline-offset:2px}
-.glasses svg{width:38px;height:54px;flex:none}
-.glasses .shape{fill:var(--mist);stroke:var(--ink);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
-.glasses label:has(input:checked) .shape{fill:var(--amber)}
-.glasses .extra{fill:none;stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
+.glasses svg{width:40px;height:62px;flex:none;overflow:visible}
 .glasses small{display:block;font-family:'DM Mono',monospace;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
 .shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .shot{position:relative;aspect-ratio:3/4;border-radius:16px;background:var(--mist);border:2px dashed var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;padding:0}
@@ -148,31 +145,59 @@ ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-si
 </div>
 
 <script>
-// id, naam, inhoud, omtrek (in een vak van 40 x 56), extra lijnen (voet), y van de rand, y van de binnenbodem
+/* Glazen. d = omtrek zonder bovenrand (in een vak van 40 x 56), rim/bottom = y van de rand en de binnenbodem,
+   liquid = y van het vloeistofoppervlak in het plaatje, foam = schuimbollen [x, y, straal], extra = losse lijnen. */
 const GLASSES = [
-  ['auto', 'Weet ik niet', 'AI herkent het', 'M9 6 L31 6 L27 52 L13 52 Z', 'M17 22 Q17 17 20.5 17 Q24 17 24 21 Q24 24 20.5 26 L20.5 30 M20.5 35 L20.5 36', 6, 52],
-  ['fluitje', 'Fluitje', '20 cl', 'M12 4 L28 4 L26 52 L14 52 Z', '', 4, 52],
-  ['vaasje', 'Vaasje', '25 cl', 'M8 8 L32 8 L27 52 L13 52 Z', '', 8, 52],
-  ['pint', 'Pint', '50 cl', 'M7 3 L33 3 Q35 13 31 19 L28 53 L12 53 L9 19 Q5 13 7 3 Z', '', 3, 53],
-  ['longdrink', 'Longdrink', '27 cl', 'M11 3 L29 3 L29 53 L11 53 Z', '', 3, 53],
-  ['waterglas', 'Waterglas', '20 cl', 'M8 20 L32 20 L29 52 L11 52 Z', '', 20, 52],
-  ['wijnglas', 'Wijnglas', '35 cl', 'M10 4 L30 4 Q34 27 20 31 Q6 27 10 4 Z', 'M20 31 L20 50 M12 52 L28 52', 4, 31],
-  ['anders', 'Ander glas', 'inhoud onbekend', 'M9 6 L31 6 L27 52 L13 52 Z', 'M15 29 L15 30 M20 29 L20 30 M25 29 L25 30', 6, 52],
+  { id: 'auto', name: 'Weet ik niet', sub: 'AI herkent het', d: 'M6 8 L11.5 49 Q11.9 52 15 52 L25 52 Q28.1 52 28.5 49 L34 8', rim: 8, bottom: 47, dashed: true,
+    extra: 'M16 24 Q16 18.5 20 18.5 Q24 18.5 24 22.5 Q24 25.5 20 27.5 L20 31 M20 36.5 L20 37.5' },
+  { id: 'fluitje', name: 'Fluitje', sub: '20 cl', d: 'M11 3 L13.5 49 Q13.7 52 16.5 52 L23.5 52 Q26.3 52 26.5 49 L29 3', rim: 3, bottom: 47, liquid: 12,
+    foam: [[15, 2.5, 4], [20.5, 0.5, 4.5], [25.5, 2.5, 3.5]], shine: 'M16 18 L17 38' },
+  { id: 'vaasje', name: 'Vaasje', sub: '25 cl', d: 'M6 8 L11.5 49 Q11.9 52 15 52 L25 52 Q28.1 52 28.5 49 L34 8', rim: 8, bottom: 47, liquid: 18,
+    foam: [[10.5, 7, 4.5], [20, 4.5, 5.5], [29.5, 7, 4.5]], shine: 'M12 24 L14.5 41' },
+  { id: 'pint', name: 'Pint', sub: '50 cl', d: 'M7 2 Q5.5 10 8 15 Q9.5 18 10 23 L12 50 Q12.2 53 15 53 L25 53 Q27.8 53 28 50 L30 23 Q30.5 18 32 15 Q34.5 10 33 2', rim: 2, bottom: 48, liquid: 11,
+    foam: [[11.5, 1.5, 4.5], [20, -0.5, 5.5], [28.5, 1.5, 4.5]], shine: 'M13.5 22 L15 42' },
+  { id: 'longdrink', name: 'Longdrink', sub: '27 cl', d: 'M10 2 L10 49 Q10 53 14 53 L26 53 Q30 53 30 49 L30 2', rim: 2, bottom: 47, liquid: 12,
+    ice: [[13.5, 17, -12], [19.5, 26, 14]], straw: 'M28 -4 L21.5 40' },
+  { id: 'waterglas', name: 'Waterglas', sub: '20 cl', d: 'M6 20 L9 49 Q9.3 53 13 53 L27 53 Q30.7 53 31 49 L34 20', rim: 20, bottom: 48, liquid: 28, shine: 'M11.5 32 L13 44' },
+  { id: 'wijnglas', name: 'Wijnglas', sub: '35 cl', d: 'M10 4 Q6 27 20 31 Q34 27 30 4', rim: 4, bottom: 31, liquid: 15, noBase: true,
+    extra: 'M20 31 L20 50 M12 52 L28 52', shine: 'M13 18 Q13.5 23 16.5 26' },
+  { id: 'anders', name: 'Ander glas', sub: 'inhoud onbekend', d: 'M6 8 L11.5 49 Q11.9 52 15 52 L25 52 Q28.1 52 28.5 49 L34 8', rim: 8, bottom: 47, dashed: true,
+    extra: 'M14 30 L14 31 M20 30 L20 31 M26 30 L26 31' },
 ];
+const INK = '#24103F';
+function glassIcon(g) {
+  const line = `fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"`;
+  const clip = 'clip-' + g.id;
+  let out = `<svg viewBox="0 -6 40 62" aria-hidden="true"><defs><clipPath id="${clip}"><path d="${g.d} Z"/></clipPath></defs>`;
+  if (g.foam) out += g.foam.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" stroke="${INK}" stroke-width="2.5"/>`).join('');
+  out += `<g clip-path="url(#${clip})"><rect x="0" y="-6" width="40" height="62" fill="${g.dashed ? 'none' : '#F3EEFA'}"/>`;
+  if (g.liquid) {
+    if (g.foam) out += `<rect x="0" y="-6" width="40" height="${g.liquid + 6}" fill="#fff"/>`;
+    out += `<rect x="0" y="${g.liquid}" width="40" height="${g.bottom - g.liquid}" fill="#FFB000"/>`;
+    if (!g.noBase) out += `<rect x="0" y="${g.bottom - 1.25}" width="40" height="2.5" fill="${INK}"/>`;
+    if (g.ice) out += g.ice.map(([x, y, a]) => `<rect x="${x}" y="${y}" width="7.5" height="7.5" rx="1.8" fill="#FFE9B8" stroke="#fff" stroke-width="1.6" transform="rotate(${a} ${x + 3.75} ${y + 3.75})"/>`).join('');
+    if (g.shine) out += `<path d="${g.shine}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".85"/>`;
+  }
+  out += '</g>';
+  if (g.straw) out += `<path d="${g.straw}" ${line}/>`;
+  out += `<path d="${g.d}${g.foam ? '' : ' Z'}" ${line}${g.dashed ? ' stroke-dasharray="4 5"' : ''}/>`;
+  if (g.extra) out += `<path d="${g.extra}" ${line}/>`;
+  return out + '</svg>';
+}
 const $ = id => document.getElementById(id);
 const shots = [null, null];
 let current = 0, stream = null;
 
-$('glasses').innerHTML = GLASSES.map(([id, name, cl, shape, extra], i) =>
-  `<label><input type="radio" name="glass" value="${id}"${i === 0 ? ' checked' : ''}><svg viewBox="0 0 40 56" aria-hidden="true"><path class="shape" d="${shape}"/><path class="extra" d="${extra}"/></svg><span>${name}<small>${cl}</small></span></label>`).join('');
+$('glasses').innerHTML = GLASSES.map((g, i) =>
+  `<label><input type="radio" name="glass" value="${g.id}"${i === 0 ? ' checked' : ''}>${glassIcon(g)}<span>${g.name}<small>${g.sub}</small></span></label>`).join('');
 
 // Het kader in de camera krijgt de vorm van het gekozen glas.
 function setFrame() {
   const id = document.querySelector('input[name=glass]:checked').value;
-  const g = GLASSES.find(x => x[0] === id);
-  $('frameShape').setAttribute('d', g[3]);
-  $('frameExtra').setAttribute('d', id === 'wijnglas' ? g[4] : '');
-  for (const [line, tag, y] of [['frameRim', 'tagRim', g[5]], ['frameBottom', 'tagBottom', g[6]]]) {
+  const g = GLASSES.find(x => x.id === id);
+  $('frameShape').setAttribute('d', g.d + ' Z');
+  $('frameExtra').setAttribute('d', id === 'wijnglas' ? g.extra : '');
+  for (const [line, tag, y] of [['frameRim', 'tagRim', g.rim], ['frameBottom', 'tagBottom', g.bottom]]) {
     $(line).setAttribute('y1', y); $(line).setAttribute('y2', y);
     $(tag).style.top = (6 + 88 * y / 56) + '%';
   }

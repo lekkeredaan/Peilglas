@@ -1,0 +1,46 @@
+/* PEILGLAS — huisstijl: een meetinstrument dat naar een feestje is gegaan.
+   Nachtpaars en lila als basis, amber is altijd de vloeistof, turquoise is altijd het doel. */
+:root{
+  --ink:#24103F; --mist:#F3EEFA; --paper:#fff; --amber:#FFB000; --amber-soft:#FFE9B8;
+  --teal:#2FE0CC; --teal-deep:#0A6F65; --teal-soft:#D5F7F2; --dark:#150A26; --muted:#5B4A78; --line:#D9CDEE;
+  --display:'Unbounded',sans-serif; --body:'Instrument Sans',system-ui,sans-serif; --mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--mist);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+button{font:inherit;cursor:pointer}
+
+.label{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.label.teal{color:var(--teal-deep)}
+.btn{display:flex;align-items:center;justify-content:center;min-height:60px;padding:0 18px;border:0;border-radius:16px;background:var(--amber);color:var(--ink);font-family:var(--body);font-weight:700;font-size:18px;text-decoration:none;text-align:center}
+.btn.line{background:transparent;border:2px solid var(--ink);min-height:52px;font-size:16px}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid var(--teal-deep);outline-offset:3px}
+.age{font-family:var(--display);font-weight:700;font-size:12px;color:var(--mist);background:var(--ink);border-radius:8px;padding:5px 7px}
+
+/* ── Startscherm ── */
+.screen{position:relative;max-width:460px;min-height:100vh;min-height:100dvh;margin:0 auto;padding:28px 24px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:20px;overflow:hidden}
+.ruler{position:absolute;right:0;top:0;bottom:0;width:18px;background-image:repeating-linear-gradient(180deg,var(--ink) 0 2px,transparent 2px 21px);opacity:.22}
+.hero{display:flex;align-items:flex-end;gap:16px;margin-top:4px}
+#glass{width:46%;max-width:190px;height:auto;flex:none;overflow:visible}
+#target{transition:opacity .35s, stroke-width .2s}
+#target.off{opacity:0}
+#target.hit{stroke-width:8}
+.readout{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;min-width:0}
+.goal{font-family:var(--display);font-weight:700;font-size:22px;line-height:1;color:var(--teal-deep)}
+.count{font-family:var(--display);font-weight:900;font-size:clamp(40px,13vw,54px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.hitline{margin-top:10px;align-self:flex-start;font-weight:700;font-size:14px;background:var(--teal-soft);color:var(--teal-deep);border-radius:8px;padding:5px 9px;opacity:0;transform:translateY(6px);transition:opacity .25s, transform .25s}
+.hitline.on{opacity:1;transform:none}
+.title h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(38px,12.5vw,50px);line-height:1;letter-spacing:-.03em}
+.title p{margin:10px 0 0;font-size:18px;line-height:1.4;color:var(--muted)}
+.actions{display:flex;flex-direction:column;gap:12px;margin-top:auto}
+.soon{margin:0;font-size:14px;color:var(--muted)}
+.foot{display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.35;color:var(--muted)}
+.foot div:first-child{display:flex;gap:10px;align-items:center}
+
+/* ── Leeftijdsvraag ── */
+.gate{position:fixed;inset:0;z-index:50;background:var(--dark);display:flex;align-items:center;justify-content:center;padding:24px}
+.gate-card{width:100%;max-width:400px;background:var(--mist);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.gate-card .age{align-self:flex-start;font-size:16px;padding:7px 10px}
+.gate-card h2{margin:0;font-family:var(--display);font-weight:900;font-size:24px;line-height:1.15;letter-spacing:-.02em}
+.gate-card p{margin:0;color:var(--muted)}
