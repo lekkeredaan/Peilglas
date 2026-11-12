@@ -2,5 +2,9 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "regions": ["fra1"],
-  "functions": { "api/measure.js": { "maxDuration": 120 } }
+  "functions": {
+    "api/measure.js": { "maxDuration": 120 },
+    "api/game.js": { "maxDuration": 120 }
+  },
+  "crons": [ { "path": "/api/cleanup", "schedule": "45 4 * * *" } ]
 }

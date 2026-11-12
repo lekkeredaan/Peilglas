@@ -86,6 +86,7 @@
   const tweens = [];
   let last = 0;
   function frame(now) {
+    if (window.PG && PG.animPaused) { last = now; return requestAnimationFrame(frame); } // startscherm niet in beeld
     const dt = Math.min(0.05, (now - last) / 1000 || 0);
     last = now; s.time += dt;
     for (let i = tweens.length - 1; i >= 0; i--) {

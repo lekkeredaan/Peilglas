@@ -1,11 +1,14 @@
 /* Lokale testserver (niet voor productie).
      node dev-server.js            -> http://localhost:5175
-   Met een sleutel in ANTHROPIC_API_KEY meet de AI echt; met PG_FAKE=1 komt er een vaste nepmeting. */
+     node dev-server.js --nep      -> met vaste nepmetingen (geen AI-sleutel nodig)
+   De database wordt nagespeeld in het geheugen. Met een sleutel in ANTHROPIC_API_KEY meet de AI echt. */
 if (process.argv.includes('--nep')) process.env.PG_FAKE = '1';
+process.env.PG_MEMORY = process.env.PG_MEMORY || '1';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const routes = { '/api/measure': require('./api/measure') };
+const db = require('./lib/db');
+const routes = { '/api/measure': require('./api/measure'), '/api/game': require('./api/game'), '/api/cleanup': require('./api/cleanup') };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const PORT = Number(process.env.PORT || 5175);
 
@@ -22,7 +25,15 @@ http.createServer(async (req, res) => {
     };
     return routes[url.pathname]({ method: req.method, body, headers: req.headers, query: Object.fromEntries(url.searchParams) }, r);
   }
-  let name = url.pathname === '/' ? 'index.html' : path.normalize(url.pathname).replace(/^([\\/])+/, '');
+  if (url.pathname.startsWith('/__db/')) {
+    // Nagespeelde Firebase, met dezelfde leesregels: een avond met exacte code, of één foto met exact id.
+    const p = decodeURIComponent(url.pathname.slice(6).replace(/\.json$/, ''));
+    const ok = /^games\/[A-Z0-9]{6}(\/|$)/.test(p) || /^photos\/[A-Z0-9]{6}\/[A-Za-z0-9]+$/.test(p);
+    res.statusCode = ok ? 200 : 401;
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify(ok ? db.memGet(p) : { error: 'Permission denied' }));
+  }
+  let name = url.pathname === '/' ? 'index.html' : path.normalize(url.pathname).replace(/^([\/])+/, '');
   if (!path.extname(name)) name += '.html'; // net als cleanUrls op Vercel
   const file = path.join(__dirname, name);
   if (!file.startsWith(__dirname) || !TYPES[path.extname(file)] || !fs.existsSync(file)) { res.statusCode = 404; return res.end('Niet gevonden'); }

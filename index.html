@@ -9,9 +9,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="game.css">
 </head>
 <body>
 
+<!-- ── Start ── -->
 <main class="screen" id="start">
   <div class="ruler" aria-hidden="true"></div>
   <div class="label">Een spel van Ravotters</div>
@@ -43,16 +45,66 @@
   </div>
 
   <div class="actions">
-    <a class="btn" href="/meettest">Meettest proberen</a>
-    <p class="soon">Het spel zelf is nog in de maak. Eerst testen we of de camera je slok goed genoeg meet.</p>
+    <button type="button" class="btn line" id="btnResume" hidden></button>
+    <button type="button" class="btn" id="btnCreate">Avond starten</button>
+    <form class="card" id="joinForm" autocomplete="off">
+      <label class="label" for="joinCode">Meedoen met een code</label>
+      <div class="coderow">
+        <input id="joinCode" class="codeinput" type="text" inputmode="text" maxlength="6" placeholder="K7M2QX" autocapitalize="characters" autocorrect="off" spellcheck="false">
+        <button type="submit" class="btn dark">Meedoen</button>
+      </div>
+    </form>
+    <p class="err" id="startErr" hidden role="alert"></p>
   </div>
 
   <div class="foot">
     <div><span class="age">18+</span><span>Alleen voor volwassenen.</span></div>
-    <div>Water en fris tellen gewoon mee. Een beurt overslaan mag altijd.</div>
+    <div>Water en fris tellen gewoon mee. Een beurt overslaan mag altijd. <a href="/meettest">Meettest</a></div>
   </div>
 </main>
 
+<!-- ── De avond: stand, mikspel en einde worden door app.js gevuld ── -->
+<main class="screen" id="evening" hidden></main>
+<main class="screen" id="round" hidden></main>
+<main class="screen dark" id="ended" hidden></main>
+
+<!-- ── Schuifblad voor keuzes ── -->
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-back" data-act="sheet-close"></div>
+  <div class="sheet-card" id="sheetCard" role="dialog" aria-modal="true"></div>
+</div>
+
+<!-- ── Camera ── -->
+<div id="cam" hidden>
+  <div>
+    <div class="label" id="camStep"></div>
+    <h2 id="camTitle"></h2>
+  </div>
+  <div id="view">
+    <video id="video" playsinline muted autoplay></video>
+    <img class="ghost" id="ghost" alt="" hidden>
+    <svg viewBox="0 0 40 56" aria-hidden="true" id="frame">
+      <path id="frameShape" d="" fill="rgba(243,238,250,0.05)" stroke="#FFB000" stroke-width="4" stroke-linejoin="round" stroke-dasharray="14 10" vector-effect="non-scaling-stroke"/>
+      <path id="frameExtra" d="" fill="none" stroke="#FFB000" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 8" vector-effect="non-scaling-stroke" opacity=".7"/>
+      <line id="frameRim" x1="-4" x2="44" stroke="#F3EEFA" stroke-width="2" opacity=".8" vector-effect="non-scaling-stroke"/>
+      <line id="frameBottom" x1="-4" x2="44" stroke="#F3EEFA" stroke-width="2" opacity=".8" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="tag" id="tagRim">rand</div>
+    <div class="tag" id="tagBottom">bodem</div>
+  </div>
+  <div class="hint" id="camHint"></div>
+  <div class="bar">
+    <button type="button" class="link" id="camFile" style="text-align:left">Foto kiezen</button>
+    <button type="button" id="shutter" aria-label="Foto maken"></button>
+    <button type="button" class="link" id="camClose" style="text-align:right">Sluiten</button>
+  </div>
+  <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+</div>
+
+<div class="busy" id="busy" hidden><div class="busy-card"><div class="spin" aria-hidden="true"></div><div id="busyText"></div></div></div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<!-- ── Leeftijdsvraag ── -->
 <div class="gate" id="gate" hidden role="dialog" aria-modal="true" aria-labelledby="gateTitle">
   <div class="gate-card">
     <span class="age">18+</span>
@@ -63,6 +115,11 @@
   </div>
 </div>
 
+<script src="config.js"></script>
+<script src="glasses.js"></script>
 <script src="start.js"></script>
+<script src="camera.js"></script>
+<script src="app.js"></script>
+<script src="movie.js"></script>
 </body>
 </html>
