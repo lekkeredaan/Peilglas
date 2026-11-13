@@ -134,7 +134,7 @@
     if (s.top) out.push({ label: 'MEESTE MIKPUNTEN', value: s.top.name, sub: `${s.top.points} punten in ${s.top.turns} ${s.top.turns === 1 ? 'beurt' : 'beurten'}.`, teal: true });
     if (s.sharp && (!s.top || s.sharp.pid !== s.top.pid)) out.push({ label: 'SCHERPSTE MIKKER', value: s.sharp.name, sub: `Gemiddeld ${num(s.sharp.avgDev)}% naast de streep.`, teal: true });
     if (s.best) out.push({ label: 'BESTE SLOK VAN DE AVOND', value: s.best.name, sub: `${num(s.best.value)}% gedronken bij een doel van ${num(s.best.target)}%. Dat is ${num(s.best.dev)}% ernaast.`, teal: true });
-    if (s.most) out.push({ label: 'DE PINEUT', value: s.most.name, sub: `${s.most.drinks} ${s.most.drinks === 1 ? 'glas' : 'glazen'} geteld. Water telt net zo hard.` });
+    if (s.most) out.push({ label: 'DE PINEUT', value: s.most.name, sub: `${s.most.alc} ${s.most.alc === 1 ? 'glas' : 'glazen'} met alcohol geteld.` });
     if (s.soft) out.push({ label: 'WATERKAMPIOEN', value: s.soft.name, sub: `${s.soft.soft} keer water of fris. Verstandig.` });
     return out;
   }
@@ -209,6 +209,8 @@
     const $ = id => document.getElementById(id);
     const note = $('movieNote');
     btn.disabled = true;
+    let awake = null;
+    try { awake = navigator.wakeLock ? await navigator.wakeLock.request('screen') : null; } catch (e) { /* mag niet of kan niet: dan zonder */ }
     try {
       const s = PG.stats(game);
       note.textContent = 'Foto\'s van de avond ophalen.';
@@ -254,7 +256,10 @@
     } catch (e) {
       note.textContent = 'De film maken is niet gelukt. Probeer het opnieuw.';
       btn.textContent = 'Aftermovie maken';
-    } finally { btn.disabled = false; }
+    } finally {
+      btn.disabled = false;
+      if (awake) awake.release().catch(() => {});
+    }
   };
 
   PG.shareMovie = async function () {

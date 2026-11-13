@@ -26,9 +26,13 @@ http.createServer(async (req, res) => {
     return routes[url.pathname]({ method: req.method, body, headers: req.headers, query: Object.fromEntries(url.searchParams) }, r);
   }
   if (url.pathname.startsWith('/__db/')) {
-    // Nagespeelde Firebase, met dezelfde leesregels: een avond met exacte code, of één foto met exact id.
+    // Nagespeelde Firebase, met dezelfde leesregels: een avond met exacte code, of één foto met exact id,
+    // en alleen zolang de avond jonger is dan 48 uur.
     const p = decodeURIComponent(url.pathname.slice(6).replace(/\.json$/, ''));
-    const ok = /^games\/[A-Z0-9]{6}(\/|$)/.test(p) || /^photos\/[A-Z0-9]{6}\/[A-Za-z0-9]+$/.test(p);
+    const shape = /^games\/[A-Z0-9]{6}(\/|$)/.test(p) || /^photos\/[A-Z0-9]{6}\/[A-Za-z0-9]+$/.test(p);
+    const born = shape ? db.memGet(`games/${p.split('/')[1]}/createdAt`) : null;
+    const fresh = born ? born > Date.now() - 172800000 : p.startsWith('games/');
+    const ok = shape && fresh;
     res.statusCode = ok ? 200 : 401;
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify(ok ? db.memGet(p) : { error: 'Permission denied' }));

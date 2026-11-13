@@ -4,7 +4,7 @@
     ".write": false,
     "games": {
       "$code": {
-        ".read": "$code.length === 6",
+        ".read": "$code.length === 6 && (!data.exists() || data.child('createdAt').val() > now - 172800000)",
         ".write": "$code.length === 6"
       }
     },
@@ -12,7 +12,7 @@
       "$code": {
         ".read": false,
         ".write": "$code.length === 6",
-        "$id": { ".read": "$code.length === 6" }
+        "$id": { ".read": "$code.length === 6 && root.child('games').child($code).child('createdAt').val() > now - 172800000" }
       }
     },
     "index": {

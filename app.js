@@ -18,6 +18,7 @@
     bod:      { name: 'Eigen bod',    how: 'Zet eerst vast hoeveel je gaat drinken. Daarna moet je het waarmaken.' },
     duel:     { name: 'Duel',         how: 'Jij tegen één ander, zelfde doel. Wie het dichtst zit, pakt de bonus.' },
   };
+  const ALCOHOL = ['bier', 'wijn', 'cocktail', 'sterk'];
   const KINDS = { bier: 'Bier', wijn: 'Wijn', fris: 'Fris', water: 'Water', cocktail: 'Cocktail', sterk: 'Sterk', warm: 'Koffie of thee', anders: 'Iets anders' };
   const ICON = {
     camera: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
@@ -87,7 +88,7 @@
   // ── Cijfers van de avond ──
   function stats(g) {
     const P = {};
-    for (const [pid, p] of Object.entries(g.players || {})) P[pid] = { pid, name: p.name, points: 0, turns: 0, devSum: 0, devN: 0, drinks: 0, soft: 0, cl: 0 };
+    for (const [pid, p] of Object.entries(g.players || {})) P[pid] = { pid, name: p.name, points: 0, turns: 0, devSum: 0, devN: 0, drinks: 0, soft: 0, alc: 0, cl: 0 };
     let best = null;
     for (const r of Object.values(g.rounds || {})) {
       for (const [pid, a] of Object.entries(r.attempts || {})) {
@@ -107,13 +108,13 @@
       const p = P[d.pid];
       totalDrinks++; totalCl += d.cl || 0;
       kinds[kinds[d.kind] !== undefined ? d.kind : 'overig']++;
-      if (p) { p.drinks++; p.cl += d.cl || 0; if (d.kind === 'water' || d.kind === 'fris') p.soft++; }
+      if (p) { p.drinks++; p.cl += d.cl || 0; if (d.kind === 'water' || d.kind === 'fris') p.soft++; if (ALCOHOL.includes(d.kind)) p.alc++; }
     }
     const list = Object.values(P).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     for (const p of list) p.avgDev = p.devN ? Math.round(p.devSum / p.devN * 10) / 10 : null;
     const sharp = list.filter(p => p.devN >= 2).sort((a, b) => a.avgDev - b.avgDev)[0] || null;
     const soft = list.filter(p => p.soft > 0).sort((a, b) => b.soft - a.soft)[0] || null;
-    const most = list.filter(p => p.drinks > 0).sort((a, b) => b.drinks - a.drinks)[0] || null; // "de pineut"
+    const most = list.filter(p => p.alc > 0).sort((a, b) => b.alc - a.alc)[0] || null; // "de pineut": de meeste glazen met alcohol
     return { list, kinds, totalCl, totalDrinks, drinks, best, sharp, most, soft, top: list[0] && list[0].points > 0 ? list[0] : null };
   }
   PG.stats = stats;
@@ -124,6 +125,7 @@
     pollBusy = true;
     try {
       const r = await fetch(`${PG.DB_URL}/games/${session.code}.json`, { cache: 'no-store' });
+      if (r.status === 401 || r.status === 403) { leave('Deze avond is voorbij. Na 48 uur wordt alles gewist.'); return; }
       if (!r.ok) throw new Error('lezen mislukt');
       const g = await r.json();
       if (!g || !g.players || !g.players[session.pid]) { leave('Deze avond bestaat niet meer.'); return; }
@@ -221,8 +223,8 @@
     if (cur) {
       const inIt = cur.who.includes(me), mine = cur.attempts && cur.attempts[me];
       banner = `<section class="card amber">
-        <div class="label">Mikspel bezig</div>
-        <div class="banner-title">${esc(MODES[cur.mode].name)} · ronde ${cur.n} van ${cur.of}</div>
+        <div class="label">Mikspel bezig · ronde ${cur.n} van ${cur.of}</div>
+        <div class="banner-title">${esc(MODES[cur.mode].name)}</div>
         <button type="button" class="btn dark" data-act="to-round">${cur.done ? 'Bekijk de uitslag' : inIt && !mine ? 'Doe mee' : 'Kijk mee'}</button>
       </section>`;
     }
@@ -395,7 +397,7 @@
     if (s.top) cards.push(stat(s.top.name, `meeste mikpunten: ${s.top.points}`, true));
     if (s.sharp) cards.push(stat(s.sharp.name, `scherpste mikker: gemiddeld ${num(s.sharp.avgDev)}% ernaast`, true));
     if (s.best) cards.push(stat(`${num(s.best.dev)}% ernaast`, `beste slok, van ${s.best.name}`, true));
-    if (s.most) cards.push(stat(s.most.name, `de pineut: ${s.most.drinks} ${s.most.drinks === 1 ? 'glas' : 'glazen'} geteld`));
+    if (s.most) cards.push(stat(s.most.name, `de pineut: ${s.most.alc} ${s.most.alc === 1 ? 'glas' : 'glazen'} met alcohol`));
     if (s.soft) cards.push(stat(s.soft.name, 'waterkampioen'));
     const max = Math.max(1, ...s.list.map(p => p.points));
     $('ended').innerHTML = `
