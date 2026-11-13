@@ -22,6 +22,8 @@
   const ICON = {
     camera: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     target: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>',
+    share: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 12v8h14v-8"/></svg>',
+    check: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
     skip: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l8 7-8 7z"/><path d="M18 5v14"/></svg>',
     bier: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12l-2 17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z"/><path d="M7 9h10"/></svg>',
     wijn: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10c0 6-2 9-5 9s-5-3-5-9z"/><path d="M12 12v8"/><path d="M8 21h8"/></svg>',
@@ -64,7 +66,11 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 3500);
   }
   function busy(text) { $('busyText').textContent = text || ''; $('busy').hidden = !text; }
-  function openSheet(html) { $('sheetCard').innerHTML = html; $('sheet').hidden = false; }
+  function openSheet(html) {
+    $('sheetCard').innerHTML = html; $('sheet').hidden = false;
+    const h = $('sheetCard').querySelector('h2');
+    $('sheetCard').setAttribute('aria-label', h ? h.textContent : 'Keuze');
+  }
   function closeSheet() { $('sheet').hidden = true; sheetState = null; }
   async function guard(el, fn) { // knop even uit, fout als melding
     if (el && el.disabled) return;
@@ -106,9 +112,8 @@
     const list = Object.values(P).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     for (const p of list) p.avgDev = p.devN ? Math.round(p.devSum / p.devN * 10) / 10 : null;
     const sharp = list.filter(p => p.devN >= 2).sort((a, b) => a.avgDev - b.avgDev)[0] || null;
-    const most = list.filter(p => p.drinks > 0).sort((a, b) => b.drinks - a.drinks)[0] || null;
     const soft = list.filter(p => p.soft > 0).sort((a, b) => b.soft - a.soft)[0] || null;
-    return { list, kinds, totalCl, totalDrinks, drinks, best, sharp, most, soft, top: list[0] && list[0].points > 0 ? list[0] : null };
+    return { list, kinds, totalCl, totalDrinks, drinks, best, sharp, soft, top: list[0] && list[0].points > 0 ? list[0] : null };
   }
   PG.stats = stats;
 
@@ -154,12 +159,13 @@
         <input id="nameInput" class="textinput" type="text" maxlength="16" placeholder="Je naam" value="${esc(store.get('pg.name') || '')}" autocapitalize="words">
         <p class="err" id="nameErr" hidden role="alert"></p>
         <button type="submit" class="btn">${esc(button)}</button>
+        <button type="button" class="link" data-act="sheet-close">Annuleren</button>
       </form>`);
     $('nameInput').focus();
     $('nameForm').onsubmit = async e => {
       e.preventDefault();
       const name = $('nameInput').value.trim();
-      const btn = e.target.querySelector('button');
+      const btn = e.target.querySelector('button[type=submit]');
       if (!name) { $('nameErr').textContent = 'Vul je naam in.'; $('nameErr').hidden = false; return; }
       btn.disabled = true;
       try { store.set('pg.name', name); await onName(name); closeSheet(); }
@@ -205,9 +211,10 @@
       <div class="rank">
         <div class="rank-top"><span><span class="pos">${i + 1}</span>${esc(p.name)}${p.pid === me ? ' <span class="you">jij</span>' : ''}</span><span class="pts">${p.points}</span></div>
         <div class="bar"><i style="width:${Math.round(p.points / max * 100)}%"></i></div>
-        <div class="rank-sub">${p.turns ? `${p.turns} ${p.turns === 1 ? 'beurt' : 'beurten'}${p.avgDev != null ? ` · gemiddeld ${num(p.avgDev)} ernaast` : ''}` : 'nog geen beurt'}${p.drinks ? ` · ${p.drinks} ${p.drinks === 1 ? 'glas' : 'glazen'}` : ''}</div>
+        <div class="rank-sub">${p.turns ? `${p.turns} ${p.turns === 1 ? 'beurt' : 'beurten'}${p.avgDev != null ? ` · gemiddeld ${num(p.avgDev)}% ernaast` : ''}` : 'nog geen beurt'}${p.drinks ? ` · ${p.drinks} ${p.drinks === 1 ? 'glas' : 'glazen'}` : ''}</div>
       </div>`).join('');
     const last = s.drinks[s.drinks.length - 1];
+    const mineCount = s.drinks.filter(d => d.pid === me).length;
     const tile = (key, label, teal) => `<div class="tile${teal ? ' teal' : ''}">${ICON[key]}<b>${s.kinds[key]}</b><span>${label}</span></div>`;
     let banner = '';
     if (cur) {
@@ -219,25 +226,24 @@
       </section>`;
     }
     $('evening').innerHTML = `
-      <div class="top"><h1>Stand van de avond</h1><button type="button" class="chip code" data-act="share" aria-label="Code delen">${esc(session.code)}</button></div>
+      <div class="top"><h1>Stand van de avond</h1><button type="button" class="chip code" data-act="share" aria-label="Code ${esc(session.code)} delen">${esc(session.code)}${ICON.share}</button></div>
       ${banner}
       <section class="card">
         <div class="label">Beste mikkers</div>
         ${rows}
-        ${s.list.length < 2 ? `<p class="fine">Je bent nog alleen. Deel de code <b>${esc(session.code)}</b> zodat de rest mee kan doen.</p>` : ''}
+        ${s.list.length < 2 ? `<p class="fine">Je bent nog alleen. De rest doet mee met de code <b>${esc(session.code)}</b>, of via de link.</p>
+          <button type="button" class="btn line" data-act="share">${ICON.share}Stuur de link naar de groep</button>` : ''}
       </section>
       <section class="card dark">
         <div class="split"><div class="label">Drankjesteller</div><div class="total"><b>${s.totalDrinks}</b> ${s.totalDrinks === 1 ? 'glas' : 'glazen'}</div></div>
         <div class="tiles">${tile('bier', 'Bier')}${tile('wijn', 'Wijn')}${tile('fris', 'Fris', true)}${tile('water', 'Water', true)}</div>
         ${s.kinds.overig ? `<div class="fine light">En ${s.kinds.overig} keer iets anders.</div>` : ''}
-        <div class="fine light">${last ? `Laatste: ${esc((game.players[last.pid] || {}).name || 'iemand')} telde ${esc(last.label)}. ${esc(last.note || '')}` : 'Nog niets geteld. Maak een foto van je glas, ook als het water is.'}</div>
+        <div class="fine light">${last ? `Laatste: ${esc((game.players[last.pid] || {}).name || 'iemand')} telde ${esc(last.label)}.` : 'Nog niets geteld. Maak een foto van je glas, ook als het water is.'}</div>
+        ${mineCount ? `<button type="button" class="link light" data-act="my-drinks">Mijn glazen bekijken of aanpassen (${mineCount})</button>` : ''}
       </section>
       <div class="actions">
-        <button type="button" class="btn" data-act="drink">${ICON.camera}Nieuw glas tellen</button>
-        <div class="two">
-          <button type="button" class="btn line" data-act="new-game"${cur ? ' disabled' : ''}>Mikspel starten</button>
-          <button type="button" class="btn line" data-act="my-drinks">Mijn glazen</button>
-        </div>
+        ${cur ? '' : `<button type="button" class="btn" data-act="new-game">${ICON.target}Mikspel starten</button>`}
+        <button type="button" class="btn${cur ? '' : ' dark wide'}" data-act="drink">${ICON.camera}Nieuw glas tellen</button>
         ${isHost ? '<button type="button" class="link" data-act="end">Avond afsluiten en aftermovie maken</button>' : '<p class="fine center">Wie de avond startte, sluit hem af. Dan komt de aftermovie.</p>'}
       </div>
       <p class="fine">Foto's worden na 48 uur automatisch gewist. Overslaan mag altijd.</p>`;
@@ -269,6 +275,7 @@
   }
   function resultCard(a, round) {
     const u = unitOf(round), level = ({ 'zeker': 4, 'redelijk zeker': 3, 'onzeker': 2 })[a.sure] || 1;
+    const hit = round.unit === 'cl' ? a.points >= 100 : a.dev <= 1;
     return `<section class="card result">
         ${resultGlass(a, round)}
         <div class="result-side">
@@ -279,13 +286,13 @@
           <div class="legend"><span class="sw"></span>Wat er nog in zit</div>
         </div>
       </section>
-      <section class="card dark verdict">
-        <div><div class="verdict-title">${num(a.dev)}${round.unit === 'cl' ? ' cl' : ' punt'} ernaast.</div><div class="fine light">${esc(verdict(a, round))}</div></div>
+      <section class="card dark verdict${hit ? ' hit' : ''}">
+        <div><div class="verdict-title">${hit ? 'Raak. ' : ''}${num(a.dev)}${u} ernaast.</div><div class="fine light">${esc(verdict(a, round))}</div></div>
         <div class="score"><b>+${a.points + (a.bonus || 0)}</b><span>punten</span></div>
       </section>
       <section class="card sure">
-        <div class="split"><span class="label">Zekerheid</span><span class="label ink">${esc(a.sure)} · ± ${num(a.margin)}</span></div>
-        <div class="sure-bar">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= level ? 'on' : ''}"></i>`).join('')}</div>
+        <div class="split"><span class="label">Zekerheid</span><span class="label ink">${esc(a.sure)} · ± ${num(a.margin)}${u}</span></div>
+        <div class="sure-bar">${[1, 2, 3, 4].map(i => `<i class="${i <= level ? 'on' : ''}"></i>`).join('')}</div>
         ${a.note ? `<div class="fine">${esc(a.note)}</div>` : ''}
       </section>`;
   }
@@ -296,9 +303,10 @@
     const inIt = cur.who.includes(me);
     const myBid = cur.bids && cur.bids[me];
     const target = cur.mode === 'bod' ? myBid : cur.target;
-    const goalText = cur.mode === 'bod'
-      ? (myBid ? `Jouw bod: drink precies ${myBid}% van je glas` : 'Zet je eigen doel vast')
-      : cur.unit === 'cl' ? `Drink precies ${cur.target} cl` : `Drink precies ${cur.target}% van je glas`;
+    const tn = v => `<span class="tnum">${esc(v)}</span>`;
+    const goalHtml = cur.mode === 'bod'
+      ? (myBid ? `Jouw bod: drink precies ${tn(myBid + '%')} van je glas` : 'Zet je eigen doel vast')
+      : cur.unit === 'cl' ? `Drink precies ${tn(cur.target + ' cl')}` : `Drink precies ${tn(cur.target + '%')} van je glas`;
 
     // Mijn deel
     let panel = '';
@@ -333,7 +341,7 @@
           <button type="button" class="link" data-act="skip">${ICON.skip}Beurt overslaan</button>`;
       } else {
         panel = `<section class="card">
-            <div class="steps"><span class="done">1 Foto voor</span><span class="on">2 Slok</span><span class="on">3 Foto na</span></div>
+            <div class="steps"><span class="done">${ICON.check}Foto voor</span><span class="on">2 Slok</span><span>3 Foto na</span></div>
             <div class="sip"><img src="${turn.before.thumb}" alt="Je glas voor de slok"><div><p class="lead">Neem nu je slok.</p><p class="fine">Mik op ${num(target)}${u}. Zet je glas daarna op dezelfde plek terug.</p></div></div>
             ${err}
             <button type="button" class="btn" data-act="shot-after">${ICON.camera}Foto na de slok maken</button>
@@ -358,7 +366,7 @@
     let foot = '';
     if (cur.done) {
       foot = cur.n < cur.of
-        ? '<button type="button" class="btn" data-act="next-round">Volgende ronde</button><button type="button" class="link" data-act="stop-game">Terug naar de stand</button>'
+        ? '<button type="button" class="btn" data-act="next-round">Volgende ronde</button><button type="button" class="link" data-act="to-evening">Naar de stand</button><button type="button" class="link" data-act="stop-ask">Mikspel stoppen</button>'
         : '<button type="button" class="btn" data-act="stop-game">Terug naar de stand</button>';
     } else {
       const waiting = cur.who.filter(pid => !(cur.attempts && cur.attempts[pid])).length;
@@ -367,8 +375,8 @@
     }
 
     $('round').innerHTML = `
-      <div class="top"><div class="label">${esc(m.name)} · ronde ${cur.n} van ${cur.of}</div><span class="chip">${esc((game.players[me] || {}).name || '')}</span></div>
-      <div class="goalcard"><div class="label teal">${cur.done ? 'Uitslag van deze ronde' : 'Het doel'}</div><h1>${esc(goalText)}</h1></div>
+      <div class="top"><div class="label">${esc(m.name)} · ronde ${cur.n} van ${cur.of}</div><span class="chip name">${esc((game.players[me] || {}).name || '')}</span></div>
+      <div class="goalcard"><div class="label teal">${cur.done ? 'Uitslag van deze ronde' : 'Het doel'}</div><h1>${goalHtml}</h1></div>
       ${panel}
       <section class="card">
         <div class="label">${cur.done ? 'Uitslag' : 'Wie is er klaar?'}</div>
@@ -384,9 +392,8 @@
     const cards = [stat(String(s.totalDrinks), s.totalDrinks === 1 ? 'glas geteld' : 'glazen geteld')];
     if (s.totalCl) cards.push(stat(`${num(Math.round(s.totalCl / 10) / 10)} l`, 'samen gedronken (ongeveer)'));
     if (s.top) cards.push(stat(s.top.name, `meeste mikpunten: ${s.top.points}`, true));
-    if (s.sharp) cards.push(stat(s.sharp.name, `scherpste mikker: gemiddeld ${num(s.sharp.avgDev)} ernaast`, true));
-    if (s.best) cards.push(stat(`${num(s.best.dev)} punt`, `beste slok, van ${s.best.name}`, true));
-    if (s.most) cards.push(stat(s.most.name, `meeste glazen geteld: ${s.most.drinks}`));
+    if (s.sharp) cards.push(stat(s.sharp.name, `scherpste mikker: gemiddeld ${num(s.sharp.avgDev)}% ernaast`, true));
+    if (s.best) cards.push(stat(`${num(s.best.dev)}% ernaast`, `beste slok, van ${s.best.name}`, true));
     if (s.soft) cards.push(stat(s.soft.name, 'waterkampioen'));
     const max = Math.max(1, ...s.list.map(p => p.points));
     $('ended').innerHTML = `
@@ -415,7 +422,7 @@
     const st = sheetState, others = Object.entries(game.players).filter(([pid]) => pid !== session.pid);
     const modes = Object.entries(MODES).map(([id, m]) => `
       <button type="button" class="option${st.mode === id ? ' on' : ''}" data-act="pick-mode" data-id="${id}"${id === 'duel' && !others.length ? ' disabled' : ''}>
-        <b>${esc(m.name)}</b><span>${esc(m.how)}</span>
+        <b>${esc(m.name)}</b><span>${id === 'duel' && !others.length ? 'Kan zodra er een tweede speler meedoet.' : esc(m.how)}</span>
       </button>`).join('');
     const extra = st.mode === 'duel'
       ? `<div class="label">Tegen wie?</div><div class="chips">${others.map(([pid, p]) => `<button type="button" class="pill${st.opponent === pid ? ' on' : ''}" data-act="pick-opp" data-id="${pid}">${esc(p.name)}</button>`).join('')}</div>`
@@ -433,7 +440,8 @@
     const cur = myGlass();
     openSheet(`<h2>Welk glas heb je?</h2>
       <div class="glasses">${PG.GLASSES.map(g => `<button type="button" class="glassopt${g.id === cur ? ' on' : ''}" data-act="pick-glass" data-id="${g.id}">${PG.glassIcon(g)}<span>${esc(g.name)}<small>${esc(g.sub)}</small></span></button>`).join('')}</div>
-      <p class="fine">Weet je het niet? Kies "Weet ik niet", dan kijkt de AI zelf.</p>`);
+      <p class="fine">Weet je het niet? Kies "Weet ik niet", dan kijkt de AI zelf.</p>
+      <button type="button" class="link" data-act="sheet-close">Annuleren</button>`);
   }
   function drinksSheet() {
     const mine = stats(game).drinks.filter(d => d.pid === session.pid).reverse();
@@ -531,12 +539,14 @@
     skip: el => guard(el, async () => { await api('skip'); setTurn({}); await poll(); }),
     'close-round': el => guard(el, async () => { await api('closeRound'); await poll(); }),
     'next-round': el => guard(el, async () => { await api('nextRound'); setTurn({}); await poll(); window.scrollTo(0, 0); }),
-    'stop-game': el => guard(el, async () => { await api('stopGame'); roundView = false; await poll(); window.scrollTo(0, 0); }),
+    'stop-ask': () => confirmSheet('Mikspel stoppen?', 'De rondes die nog over zijn vervallen voor iedereen. De punten tot nu toe blijven staan.', 'Ja, stop het mikspel', 'stop-game'),
+    'stop-game': el => guard(el, async () => { await api('stopGame'); closeSheet(); roundView = false; await poll(); window.scrollTo(0, 0); }),
     end: () => confirmSheet('Avond afsluiten?', 'Daarna kan niemand meer mikken of glazen tellen. Iedereen krijgt de eindstand en de aftermovie te zien.', 'Ja, sluit de avond af', 'end-yes'),
     'end-yes': el => guard(el, async () => { await api('endEvening'); closeSheet(); await poll(); window.scrollTo(0, 0); }),
     movie: el => PG.runMovie && PG.runMovie(el, game, session.code),
     'movie-share': () => PG.shareMovie && PG.shareMovie(),
-    home: () => leave(''),
+    home: () => confirmSheet('Terug naar het begin?', 'Je verlaat deze avond op dit toestel. Wil je het filmpje houden, bewaar het dan eerst.', 'Ja, terug naar het begin', 'home-yes'),
+    'home-yes': () => leave(''),
   };
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]');

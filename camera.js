@@ -7,7 +7,7 @@
    ══════════════════════════════════════════════════════════════ */
 (function () {
   const $ = id => document.getElementById(id);
-  let stream = null, finish = null;
+  let stream = null, finish = null, pickOnly = false;
 
   // Van een beeld (video of afbeelding) naar een jpeg van hooguit `max` px, optioneel bijgesneden.
   function toJpeg(source, sw, sh, max, quality, crop) {
@@ -45,6 +45,7 @@
   }
 
   $('shutter').onclick = () => {
+    if (pickOnly) { stop(); $('camInput').click(); return; } // geen camera: de ronde knop opent de fotokiezer
     const v = $('video');
     if (!v.videoWidth) return;
     // Alleen het zichtbare deel bewaren (de video vult het vlak en wordt aan de randen afgesneden).
@@ -83,11 +84,11 @@
       // (De fotokiezer vanzelf openen mag van telefoons alleen direct na een tik.)
       const noCamera = () => {
         $('camHint').hidden = false;
-        $('camHint').textContent = 'De camera kan hier niet open. Tik op "Foto kiezen" om een foto te maken of te kiezen.';
-        $('shutter').disabled = true;
+        $('camHint').textContent = 'De camera kan hier niet open. Tik op de ronde knop om een foto te maken of te kiezen.';
+        pickOnly = true; $('shutter').setAttribute('aria-label', 'Foto maken of kiezen');
         $('cam').hidden = false;
       };
-      $('shutter').disabled = false;
+      pickOnly = false; $('shutter').disabled = false; $('shutter').setAttribute('aria-label', 'Foto maken');
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return noCamera();
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });

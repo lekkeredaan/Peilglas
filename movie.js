@@ -132,9 +132,8 @@
     if (s.totalDrinks) out.push({ label: 'GLAZEN GETELD', count: s.totalDrinks, format: v => String(v), sub: parts.join(' · ') });
     if (s.totalCl) out.push({ label: 'SAMEN GEDRONKEN', count: Math.round(s.totalCl / 10) / 10, decimals: true, format: v => `${num(v)} l`, sub: 'Ongeveer, volgens de drankjesteller. Water en fris tellen mee.' });
     if (s.top) out.push({ label: 'MEESTE MIKPUNTEN', value: s.top.name, sub: `${s.top.points} punten in ${s.top.turns} ${s.top.turns === 1 ? 'beurt' : 'beurten'}.`, teal: true });
-    if (s.sharp && (!s.top || s.sharp.pid !== s.top.pid)) out.push({ label: 'SCHERPSTE MIKKER', value: s.sharp.name, sub: `Gemiddeld ${num(s.sharp.avgDev)} punt naast de streep.`, teal: true });
-    if (s.best) out.push({ label: 'BESTE SLOK VAN DE AVOND', value: s.best.name, sub: `${num(s.best.value)}% gedronken bij een doel van ${num(s.best.target)}%. Dat is ${num(s.best.dev)} punt ernaast.`, teal: true });
-    if (s.most) out.push({ label: 'MEESTE GLAZEN GETELD', value: s.most.name, sub: `${s.most.drinks} ${s.most.drinks === 1 ? 'glas' : 'glazen'}. Water telt net zo hard.` });
+    if (s.sharp && (!s.top || s.sharp.pid !== s.top.pid)) out.push({ label: 'SCHERPSTE MIKKER', value: s.sharp.name, sub: `Gemiddeld ${num(s.sharp.avgDev)}% naast de streep.`, teal: true });
+    if (s.best) out.push({ label: 'BESTE SLOK VAN DE AVOND', value: s.best.name, sub: `${num(s.best.value)}% gedronken bij een doel van ${num(s.best.target)}%. Dat is ${num(s.best.dev)}% ernaast.`, teal: true });
     if (s.soft) out.push({ label: 'WATERKAMPIOEN', value: s.soft.name, sub: `${s.soft.soft} keer water of fris. Verstandig.` });
     return out;
   }
