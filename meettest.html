@@ -70,6 +70,12 @@ ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-si
   <p style="margin:0;color:var(--muted)">Maak een foto van je glas, neem een slok en maak dezelfde foto nog een keer. De AI schat hoeveel eruit is.</p>
 
   <section class="card">
+    <label class="label" for="access">Toegangscode</label>
+    <input id="access" type="text" maxlength="40" placeholder="XXXX-XXXX" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" style="height:52px;border:2px solid var(--ink);border-radius:12px;background:var(--mist);color:var(--ink);font-family:'DM Mono',monospace;font-size:18px;letter-spacing:.12em;text-transform:uppercase;padding:0 14px;width:100%">
+    <p style="margin:0;font-size:14px;color:var(--muted)">Dezelfde code als waarmee je een avond start. Nog geen code? <a href="https://www.ravotters.nl/peilglas" target="_blank" rel="noopener">Koop toegang op ravotters.nl</a>.</p>
+  </section>
+
+  <section class="card">
     <div class="label">1 · Welk glas is het?</div>
     <div class="glasses" id="glasses"></div>
   </section>
@@ -279,13 +285,17 @@ $('file').onchange = e => {
 };
 
 const num = x => String(x).replace('.', ',');
+try { const a = JSON.parse(localStorage.getItem('pg.access')); if (a && a.code) $('access').value = a.code; } catch (e) { /* geen opslag */ }
 
 $('go').onclick = async () => {
   show('error', false); show('result', false); show('busy', true);
   $('go').disabled = true;
   try {
     const glass = document.querySelector('input[name=glass]:checked').value;
-    const r = await fetch('/api/measure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ before: shots[0], after: shots[1], glass }) });
+    const access = $('access').value.trim().toUpperCase();
+    if (!access) throw new Error('Vul eerst je toegangscode in.');
+    try { localStorage.setItem('pg.access', JSON.stringify({ code: access })); } catch (e) { /* niet erg */ }
+    const r = await fetch('/api/measure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ before: shots[0], after: shots[1], glass, access }) });
     const data = await r.json().catch(() => null);
     if (!data?.ok) throw new Error(data?.error || 'Het meten is niet gelukt. Probeer het opnieuw.');
     render(data.result, data.ms);

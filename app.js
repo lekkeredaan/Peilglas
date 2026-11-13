@@ -11,6 +11,9 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const num = x => String(x).replace('.', ',');
   const POLL_MS = 2000;
+  const OPEN_END_MS = 60 * 60 * 1000; // na een uur mag iedereen de avond afsluiten
+  const anyoneMayEnd = g => !!g && Date.now() - Number(g.createdAt || 0) >= OPEN_END_MS;
+  let lastOpenEnd = false;
 
   const MODES = {
     streep:   { name: 'Op de streep', how: 'Iedereen krijgt hetzelfde doel. Drink precies dat deel van je glas.' },
@@ -130,7 +133,8 @@
       const g = await r.json();
       if (!g || !g.players || !g.players[session.pid]) { leave('Deze avond bestaat niet meer.'); return; }
       const json = JSON.stringify(g);
-      if (json !== lastJson) { lastJson = json; game = g; render(); }
+      const openEnd = anyoneMayEnd(g); // ook opnieuw tekenen op het moment dat het uur om is
+      if (json !== lastJson || openEnd !== lastOpenEnd) { lastJson = json; lastOpenEnd = openEnd; game = g; render(); }
     } catch (e) { /* even geen verbinding: volgende keer opnieuw */ }
     finally { pollBusy = false; }
   }
@@ -154,12 +158,20 @@
   }
   function startErr(msg) { $('startErr').textContent = msg || ''; $('startErr').hidden = !msg; }
 
-  function askName(title, button, onName) {
+  // Een eerder gebruikte toegangscode die nog geldig is, vullen we alvast in.
+  function savedAccess() {
+    const a = store.get('pg.access');
+    return a && a.code && (!a.expiresAt || new Date(a.expiresAt) > new Date()) ? a.code : '';
+  }
+  function askName(title, button, onName, withCode) {
     sheetState = { kind: 'name', onName };
     openSheet(`<h2>${esc(title)}</h2>
       <form id="nameForm" autocomplete="off">
         <label class="label" for="nameInput">Hoe heet je?</label>
         <input id="nameInput" class="textinput" type="text" maxlength="16" placeholder="Je naam" value="${esc(store.get('pg.name') || '')}" autocapitalize="words">
+        ${withCode ? `<label class="label" for="accessInput">Toegangscode</label>
+        <input id="accessInput" class="textinput code" type="text" maxlength="40" placeholder="XXXX-XXXX" value="${esc(savedAccess())}" autocapitalize="characters" autocorrect="off" spellcheck="false">
+        <p class="fine">Staat in de mail na je aankoop en werkt 72 uur vanaf het eerste gebruik. Alleen wie de avond start heeft hem nodig. Nog geen code? <a href="https://www.ravotters.nl/peilglas" target="_blank" rel="noopener">Koop toegang op ravotters.nl</a>.</p>` : ''}
         <p class="err" id="nameErr" hidden role="alert"></p>
         <button type="submit" class="btn">${esc(button)}</button>
         <button type="button" class="link" data-act="sheet-close">Annuleren</button>
@@ -170,8 +182,11 @@
       const name = $('nameInput').value.trim();
       const btn = e.target.querySelector('button[type=submit]');
       if (!name) { $('nameErr').textContent = 'Vul je naam in.'; $('nameErr').hidden = false; return; }
+      const access = withCode ? $('accessInput').value.trim().toUpperCase() : '';
+      if (withCode && !access) { $('nameErr').textContent = 'Vul je toegangscode in. Die staat in de mail na je aankoop.'; $('nameErr').hidden = false; return; }
+      $('nameErr').hidden = true;
       btn.disabled = true;
-      try { store.set('pg.name', name); await onName(name); closeSheet(); }
+      try { store.set('pg.name', name); await onName(name, access); closeSheet(); }
       catch (err) { $('nameErr').textContent = err.message; $('nameErr').hidden = false; }
       finally { btn.disabled = false; }
     };
@@ -183,11 +198,12 @@
       const j = await api(action, data);
       session = { code: j.code, token, pid: j.pid };
       store.set('pg.session', session);
+      if (data.access) store.set('pg.access', { code: data.access, expiresAt: j.accessExpiresAt || null });
       history.replaceState(null, '', location.pathname);
       lastJson = ''; startPolling();
     } catch (e) { session = null; throw e; }
   }
-  $('btnCreate').onclick = () => { startErr(''); askName('Avond starten', 'Start de avond', name => enter('create', { name })); };
+  $('btnCreate').onclick = () => { startErr(''); askName('Avond starten', 'Start de avond', (name, access) => enter('create', { name, access }), true); };
   $('joinForm').onsubmit = e => {
     e.preventDefault(); startErr('');
     const code = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -247,7 +263,7 @@
       <div class="actions">
         ${cur ? '' : `<button type="button" class="btn" data-act="new-game">${ICON.target}Mikspel starten</button>`}
         <button type="button" class="btn${cur ? '' : ' dark wide'}" data-act="drink">${ICON.camera}Nieuw glas tellen</button>
-        ${isHost ? '<button type="button" class="link" data-act="end">Avond afsluiten en aftermovie maken</button>' : '<p class="fine center">Wie de avond startte, sluit hem af. Dan komt de aftermovie.</p>'}
+        ${isHost || anyoneMayEnd(game) ? '<button type="button" class="link" data-act="end">Avond afsluiten en aftermovie maken</button>' : '<p class="fine center">Wie de avond startte, sluit hem af. Dan komt de aftermovie. Na een uur kan iedereen afsluiten.</p>'}
       </div>
       <p class="fine">Foto's worden na 48 uur automatisch gewist. Overslaan mag altijd.</p>`;
   }

@@ -12,10 +12,12 @@
    ══════════════════════════════════════════════════════════════ */
 const db = require('../lib/db');
 const ai = require('../lib/measure');
+const { checkAccess, clientInfo } = require('../lib/access');
 
 const MAX_PLAYERS = 20;
 const MAX_AI_PER_GAME = Number(process.env.PG_MAX_AI_PER_GAME || 250);
 const MAX_AI_PER_DAY = Number(process.env.PG_MAX_AI_PER_DAY || 2500);
+const OPEN_END_MS = 60 * 60 * 1000;         // na een uur mag iedereen de avond afsluiten
 const MAX_TRIES = 3;                       // per speler per ronde (foto's opnieuw)
 const MAX_PHOTO = 1_800_000, MAX_THUMB = 160_000;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -103,10 +105,14 @@ function newRound(mode, n, of, who, by) {
 
 const actions = {
   // ── Avond starten en meedoen ──
-  async create(body) {
+  // Klopt de toegangscode? (alleen controleren, er wordt niets aangemaakt)
+  async checkCode(body, client) { return checkAccess(body.access, client); },
+
+  async create(body, client) {
     need(validToken(body.token), 'Sessie ongeldig. Herlaad de pagina.');
     const name = cleanName(body.name);
     need(name.length >= 1, 'Vul je naam in.');
+    const access = await checkAccess(body.access, client); // alleen wie de avond start heeft een code nodig
     const pid = db.pidOf(body.token);
     let code = '';
     for (let i = 0; i < 6; i++) { code = genCode(); if (!(await db.get(`games/${code}/createdAt`))) break; code = ''; }
@@ -114,7 +120,7 @@ const actions = {
     const now = Date.now();
     await db.put(`games/${code}`, { createdAt: now, hostPid: pid, phase: 'open', players: { [pid]: { name, at: now } } });
     await db.put(`${db.indexPath()}/codes/${code}`, now);
-    return { code, pid };
+    return { code, pid, accessExpiresAt: access.expiresAt };
   },
 
   async join(body) {
@@ -292,7 +298,7 @@ const actions = {
   // ── Avond afsluiten ──
   async endEvening(body) {
     const { code, game, isHost } = await load(body);
-    need(isHost, 'Alleen wie de avond startte kan hem afsluiten.', 403);
+    need(isHost || Date.now() - Number(game.createdAt || 0) >= OPEN_END_MS, 'Het eerste uur kan alleen wie de avond startte hem afsluiten.', 403);
     const cur = game.cur && game.rounds?.[game.cur];
     if (cur && !cur.done) await finish(code, game.cur, cur);
     await db.patch(`games/${code}`, { phase: 'ended', endedAt: Date.now(), cur: null });
@@ -307,10 +313,10 @@ module.exports = async function handler(req, res) {
   const fn = body && actions[body.action];
   if (!fn) return res.status(400).json({ ok: false, error: 'Onbekende actie' });
   try {
-    const out = await fn(body);
+    const out = await fn(body, clientInfo(req));
     return res.status(200).json({ ok: true, ...out });
   } catch (e) {
-    if (e instanceof Oops) return res.status(e.status).json({ ok: false, error: e.message });
+    if (e instanceof Oops || e.expose) return res.status(e.status || 400).json({ ok: false, error: e.message });
     console.error(body.action, 'mislukt:', e.message);
     return res.status(500).json({ ok: false, error: 'Er ging iets mis op de server. Probeer het opnieuw.' });
   }

@@ -3,8 +3,10 @@
    POST { before: <jpeg base64>, after: <jpeg base64>, glass: 'vaasje' | 'auto' | ... }
    Antwoord: { ok, result } met het gedronken deel, de marge en de zekerheid.
    Foto's worden hier niet bewaard: ze gaan naar de AI en zijn daarna weg.
+   Net als een avond starten vraagt de meettest een toegangscode (veld access).
    ══════════════════════════════════════════════════════════════ */
 const { measure, hasAI } = require('../lib/measure');
+const { checkAccess, clientInfo } = require('../lib/access');
 
 const MAX_B64 = 1_800_000;            // ruim 1,3 MB per foto
 const PER_HOUR = Number(process.env.PG_TEST_PER_HOUR || 60);
@@ -25,6 +27,9 @@ module.exports = async function handler(req, res) {
   const before = cleanImage(body.before), after = cleanImage(body.after);
   if (!before || !after) return res.status(400).json({ ok: false, error: 'Er zijn twee foto\'s nodig (voor en na).' });
   if (!hasAI() && process.env.PG_FAKE !== '1') return res.status(503).json({ ok: false, error: 'De AI-sleutel is nog niet ingesteld op de server.' });
+
+  try { await checkAccess(body.access, clientInfo(req)); }
+  catch (e) { return res.status(e.expose ? e.status : 500).json({ ok: false, error: e.expose ? e.message : 'De toegangscode kon niet gecontroleerd worden.' }); }
 
   const now = Date.now();
   while (calls.length && now - calls[0] > 3600000) calls.shift();
