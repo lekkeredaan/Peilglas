@@ -113,7 +113,8 @@
     for (const p of list) p.avgDev = p.devN ? Math.round(p.devSum / p.devN * 10) / 10 : null;
     const sharp = list.filter(p => p.devN >= 2).sort((a, b) => a.avgDev - b.avgDev)[0] || null;
     const soft = list.filter(p => p.soft > 0).sort((a, b) => b.soft - a.soft)[0] || null;
-    return { list, kinds, totalCl, totalDrinks, drinks, best, sharp, soft, top: list[0] && list[0].points > 0 ? list[0] : null };
+    const most = list.filter(p => p.drinks > 0).sort((a, b) => b.drinks - a.drinks)[0] || null; // "de pineut"
+    return { list, kinds, totalCl, totalDrinks, drinks, best, sharp, most, soft, top: list[0] && list[0].points > 0 ? list[0] : null };
   }
   PG.stats = stats;
 
@@ -394,6 +395,7 @@
     if (s.top) cards.push(stat(s.top.name, `meeste mikpunten: ${s.top.points}`, true));
     if (s.sharp) cards.push(stat(s.sharp.name, `scherpste mikker: gemiddeld ${num(s.sharp.avgDev)}% ernaast`, true));
     if (s.best) cards.push(stat(`${num(s.best.dev)}% ernaast`, `beste slok, van ${s.best.name}`, true));
+    if (s.most) cards.push(stat(s.most.name, `de pineut: ${s.most.drinks} ${s.most.drinks === 1 ? 'glas' : 'glazen'} geteld`));
     if (s.soft) cards.push(stat(s.soft.name, 'waterkampioen'));
     const max = Math.max(1, ...s.list.map(p => p.points));
     $('ended').innerHTML = `
