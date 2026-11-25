@@ -9,7 +9,8 @@
 (function () {
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const num = x => String(x).replace('.', ',');
+  const num = x => esc(String(x).replace('.', ','));
+  const int = x => (Number.isFinite(+x) ? +x : 0);   // getallen uit de database: nooit tekst in de pagina zetten
   const POLL_MS = 2000;
   const OPEN_END_MS = 60 * 60 * 1000; // na een uur mag iedereen de avond afsluiten
   const anyoneMayEnd = g => !!g && Date.now() - Number(g.createdAt || 0) >= OPEN_END_MS;
@@ -70,12 +71,15 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 3500);
   }
   function busy(text) { $('busyText').textContent = text || ''; $('busy').hidden = !text; }
+  let sheetAt = 0;
   function openSheet(html) {
+    if ($('sheet').hidden) sheetAt = Date.now();
     $('sheetCard').innerHTML = html; $('sheet').hidden = false;
     const h = $('sheetCard').querySelector('h2');
     $('sheetCard').setAttribute('aria-label', h ? h.textContent : 'Keuze');
   }
-  function closeSheet() { $('sheet').hidden = true; sheetState = null; }
+  let uiChangedAt = 0; // moment waarop een keuzeblad sloot of het scherm wisselde
+  function closeSheet() { if (!$('sheet').hidden) uiChangedAt = Date.now(); $('sheet').hidden = true; sheetState = null; }
   async function guard(el, fn) { // knop even uit, fout als melding
     if (el && el.disabled) return;
     if (el) el.disabled = true;
@@ -83,6 +87,7 @@
   }
 
   function show(view) {
+    if ($(view).hidden) uiChangedAt = Date.now();
     for (const v of ['start', 'evening', 'round', 'ended']) $(v).hidden = v !== view;
     PG.animPaused = view !== 'start';
     document.querySelector('meta[name=theme-color]').content = view === 'ended' ? '#150A26' : '#F3EEFA';
@@ -97,9 +102,9 @@
       for (const [pid, a] of Object.entries(r.attempts || {})) {
         const p = P[pid];
         if (!p || a.skip) continue;
-        p.points += (a.points || 0) + (a.bonus || 0); p.turns++;
+        p.points += int(a.points) + int(a.bonus); p.turns++;
         if (r.unit === 'pct') {
-          p.devSum += a.dev; p.devN++;
+          p.devSum += int(a.dev); p.devN++;
           if (!best || a.dev < best.dev) best = { name: p.name, dev: a.dev, value: a.value, target: a.target };
         }
       }
@@ -109,9 +114,9 @@
     const drinks = Object.entries(g.drinks || {}).map(([id, d]) => ({ id, ...d })).sort((a, b) => a.at - b.at);
     for (const d of drinks) {
       const p = P[d.pid];
-      totalDrinks++; totalCl += d.cl || 0;
+      totalDrinks++; totalCl += int(d.cl);
       kinds[kinds[d.kind] !== undefined ? d.kind : 'overig']++;
-      if (p) { p.drinks++; p.cl += d.cl || 0; if (d.kind === 'water' || d.kind === 'fris') p.soft++; if (ALCOHOL.includes(d.kind)) p.alc++; }
+      if (p) { p.drinks++; p.cl += int(d.cl); if (d.kind === 'water' || d.kind === 'fris') p.soft++; if (ALCOHOL.includes(d.kind)) p.alc++; }
     }
     const list = Object.values(P).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     for (const p of list) p.avgDev = p.devN ? Math.round(p.devSum / p.devN * 10) / 10 : null;
@@ -213,8 +218,11 @@
   $('btnResume').onclick = () => { session = store.get('pg.session'); if (session) { lastJson = ''; startPolling(); } };
 
   // ── Tekenen ──
+  // Een ronde die het spel niet kent (kapotte of geknoeide waarden) slaan we over in plaats van vast te lopen.
+  const validRound = r => !!r && typeof r === 'object' && !!MODES[r.mode] && Array.isArray(r.who);
   function render() {
     if (!game) return;
+    if (game.rounds && game.cur && !validRound(game.rounds[game.cur])) game.cur = null;
     const cur = game.cur && game.rounds && game.rounds[game.cur];
     if (turn.rid && turn.rid !== game.cur) setTurn({});
     if (!cur) roundView = false;
@@ -239,7 +247,7 @@
     if (cur) {
       const inIt = cur.who.includes(me), mine = cur.attempts && cur.attempts[me];
       banner = `<section class="card amber">
-        <div class="label">Mikspel bezig · ronde ${cur.n} van ${cur.of}</div>
+        <div class="label">Mikspel bezig · ronde ${int(cur.n)} van ${int(cur.of)}</div>
         <div class="banner-title">${esc(MODES[cur.mode].name)}</div>
         <button type="button" class="btn dark" data-act="to-round">${cur.done ? 'Bekijk de uitslag' : inIt && !mine ? 'Doe mee' : 'Kijk mee'}</button>
       </section>`;
@@ -307,7 +315,7 @@
       </section>
       <section class="card dark verdict${hit ? ' hit' : ''}">
         <div><div class="verdict-title">${hit ? 'Raak. ' : ''}${num(a.dev)}${u} ernaast.</div><div class="fine light">${esc(verdict(a, round))}</div></div>
-        <div class="score"><b>+${a.points + (a.bonus || 0)}</b><span>punten</span></div>
+        <div class="score"><b>+${int(a.points) + int(a.bonus)}</b><span>punten</span></div>
       </section>
       <section class="card sure">
         <div class="split"><span class="label">Zekerheid</span><span class="label ink">${esc(a.sure)} · ± ${num(a.margin)}${u}</span></div>
@@ -372,13 +380,13 @@
 
     // Iedereen in deze ronde
     const order = cur.who.map(pid => ({ pid, name: (game.players[pid] || {}).name || '?', a: cur.attempts && cur.attempts[pid] }));
-    if (cur.done) order.sort((x, y) => ((y.a && !y.a.skip ? y.a.points + (y.a.bonus || 0) : -1) - (x.a && !x.a.skip ? x.a.points + (x.a.bonus || 0) : -1)));
+    if (cur.done) order.sort((x, y) => ((y.a && !y.a.skip ? int(y.a.points) + int(y.a.bonus) : -1) - (x.a && !x.a.skip ? int(x.a.points) + int(x.a.bonus) : -1)));
     const people = order.map(o => {
       let right = '<span class="state">bezig</span>';
       if (o.a && o.a.skip) right = '<span class="state">overgeslagen</span>';
-      else if (o.a) right = `<span class="state done">${num(o.a.value)}${u.trim()} · ${num(o.a.dev)} ernaast</span><span class="pts">+${o.a.points + (o.a.bonus || 0)}</span>`;
+      else if (o.a) right = `<span class="state done">${num(o.a.value)}${u.trim()} · ${num(o.a.dev)} ernaast</span><span class="pts">+${int(o.a.points) + int(o.a.bonus)}</span>`;
       else if (cur.done) right = '<span class="state">niet gemeten</span>';
-      else if (cur.mode === 'bod' && cur.bids && cur.bids[o.pid]) right = `<span class="state">mikt op ${cur.bids[o.pid]}%</span>`;
+      else if (cur.mode === 'bod' && cur.bids && cur.bids[o.pid]) right = `<span class="state">mikt op ${int(cur.bids[o.pid])}%</span>`;
       return `<div class="person"><span class="pname">${esc(o.name)}${o.pid === me ? ' <span class="you">jij</span>' : ''}${o.a && o.a.bonus ? ' <span class="you teal">duelbonus</span>' : ''}</span>${right}</div>`;
     }).join('');
 
@@ -394,7 +402,7 @@
     }
 
     $('round').innerHTML = `
-      <div class="top"><div class="label">${esc(m.name)} · ronde ${cur.n} van ${cur.of}</div><span class="chip name">${esc((game.players[me] || {}).name || '')}</span></div>
+      <div class="top"><div class="label">${esc(m.name)} · ronde ${int(cur.n)} van ${int(cur.of)}</div><span class="chip name">${esc((game.players[me] || {}).name || '')}</span></div>
       <div class="goalcard"><div class="label teal">${cur.done ? 'Uitslag van deze ronde' : 'Het doel'}</div><h1>${goalHtml}</h1></div>
       ${panel}
       <section class="card">
@@ -445,7 +453,7 @@
         <b>${esc(m.name)}</b><span>${id === 'duel' && !others.length ? 'Kan zodra er een tweede speler meedoet.' : esc(m.how)}</span>
       </button>`).join('');
     const extra = st.mode === 'duel'
-      ? `<div class="label">Tegen wie?</div><div class="chips">${others.map(([pid, p]) => `<button type="button" class="pill${st.opponent === pid ? ' on' : ''}" data-act="pick-opp" data-id="${pid}">${esc(p.name)}</button>`).join('')}</div>`
+      ? `<div class="label">Tegen wie?</div><div class="chips">${others.map(([pid, p]) => `<button type="button" class="pill${st.opponent === pid ? ' on' : ''}" data-act="pick-opp" data-id="${esc(pid)}">${esc(p.name)}</button>`).join('')}</div>`
       : '';
     openSheet(`<h2>Mikspel starten</h2>
       <div class="options">${modes}</div>
@@ -467,7 +475,7 @@
     const mine = stats(game).drinks.filter(d => d.pid === session.pid).reverse();
     const time = at => new Date(at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
     openSheet(`<h2>Mijn glazen</h2>
-      ${mine.length ? mine.map(d => `<div class="person"><span class="pname">${esc(d.label)} <span class="state">${time(d.at)} · ongeveer ${d.cl} cl</span></span><button type="button" class="pill" data-act="fix-drink" data-id="${d.id}">Klopt niet</button></div>`).join('') : '<p class="fine">Je hebt nog niets geteld.</p>'}
+      ${mine.length ? mine.map(d => `<div class="person"><span class="pname">${esc(d.label)} <span class="state">${time(d.at)} · ongeveer ${int(d.cl)} cl</span></span><button type="button" class="pill" data-act="fix-drink" data-id="${esc(d.id)}">Klopt niet</button></div>`).join('') : '<p class="fine">Je hebt nog niets geteld.</p>'}
       <button type="button" class="link" data-act="sheet-close">Sluiten</button>`);
   }
   function fixSheet(id, fresh) {
@@ -571,6 +579,10 @@
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
+    // Een dubbele tik op een knop mag niet meteen doorvallen op het keuzeblad dat de eerste tik opende.
+    if (el.closest('#sheet') && Date.now() - sheetAt < 450) return;
+    // ...en ook niet op de knop die na het sluiten van een blad of het wisselen van scherm onder de vinger ligt.
+    if (!el.closest('#sheet') && Date.now() - uiChangedAt < 450) return;
     const fn = acts[el.dataset.act];
     if (fn) fn(el);
   });

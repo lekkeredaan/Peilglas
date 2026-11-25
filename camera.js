@@ -90,11 +90,20 @@
       };
       pickOnly = false; $('shutter').disabled = false; $('shutter').setAttribute('aria-label', 'Foto maken');
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return noCamera();
+      // Meteen laten zien dat er iets gebeurt: het vragen om de camera kan een paar tellen duren.
+      $('cam').hidden = false;
+      if (!opts.hint) $('camHint').hidden = false;
+      const hintText = $('camHint').textContent;
+      $('camHint').textContent = 'Camera openen…';
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        const got = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        if (finish !== resolve) { got.getTracks().forEach(t => t.stop()); return; } // intussen gesloten
+        stream = got;
         $('video').srcObject = stream;
+        $('camHint').textContent = hintText; $('camHint').hidden = !opts.hint;
         $('cam').hidden = false;
       } catch (e) {
+        if (finish !== resolve) return;
         noCamera();
       }
     });

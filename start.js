@@ -12,12 +12,18 @@
   // ── 18+ ──
   let adult = false;
   try { adult = localStorage.getItem('pg.adult') === '1'; } catch (e) { /* geen opslag: gewoon elke keer vragen */ }
-  if (!adult) $('gate').hidden = false;
+  // De Ja-knop ligt op de plek van "Avond starten". Tikken in de eerste 1,2 seconde tellen niet mee,
+  // zodat wie tijdens het laden al op "Avond starten" tikt niet ongelezen "Ja, ik ben 18" kiest.
+  let gateAt = 0;
+  if (!adult) { $('gate').hidden = false; gateAt = Date.now(); }
+  const gateTooSoon = () => Date.now() - gateAt < 1200;
   $('gateYes').onclick = () => {
+    if (gateTooSoon()) return;
     try { localStorage.setItem('pg.adult', '1'); } catch (e) { /* niet erg */ }
     $('gate').hidden = true;
   };
   $('gateNo').onclick = () => {
+    if (gateTooSoon()) return;
     $('gateTitle').textContent = 'Dan is dit spel niet voor jou.';
     $('gateText').textContent = 'Peilglas is alleen voor wie 18 jaar of ouder is. Tot later.';
     $('gateYes').hidden = true; $('gateNo').hidden = true;
